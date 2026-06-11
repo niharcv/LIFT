@@ -1,0 +1,19 @@
+# Firebase Secrets
+LIFT/GoogleService-Info.plist
+LIFT/GoogleService-Info*.plist
+
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.moved-aside
+*.xcuserstate
+*.xccheckout
+*.xsyncdiary
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
