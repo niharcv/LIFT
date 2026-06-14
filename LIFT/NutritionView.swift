@@ -363,23 +363,11 @@ struct NutritionView: View {
                         .keyboardDoneButton()
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("DATE")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                    
-                    DatePicker("", selection: $selectedWeightDate, displayedComponents: .date)
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
-                        .colorScheme(.dark)
-                        .frame(maxHeight: 120)
-                }
-                
                 Button(action: {
                     hideKeyboard()
                     let cleanString = newWeightString.replacingOccurrences(of: ",", with: ".")
                     if let weight = Double(cleanString) {
-                        dbService.saveWeightLog(weight: weight, date: selectedWeightDate) { success in
+                        dbService.saveWeightLog(weight: weight, date: currentDate) { success in
                             DispatchQueue.main.async {
                                 newWeightString = ""
                                 showingWeightLogSheet = false

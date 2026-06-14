@@ -217,10 +217,19 @@ extension DatabaseService {
             return
         }
         
-        let newLog = WeightLog(weight: weight, date: date)
+        let calendar = Calendar.current
+        let existingLog = weightLogs.first { calendar.isDate($0.date, inSameDayAs: date) }
         
-        do {
-            _ = try db.collection("users").document(uid).collection("weight_logs").addDocument(from: newLog)
+        if let existing = existingLog, let docId = existing.id {
+            // Update existing log (runs asynchronously in Firestore)
+            db.collection("users").document(uid).collection("weight_logs").document(docId).updateData([
+                "weight": weight,
+                "date": date
+            ]) { error in
+                if let error = error {
+                    print("Error updating weight log in background: \(error.localizedDescription)")
+                }
+            }
             
             // Also update current weight in profile if it exists
             if var profile = userProfile {
@@ -229,9 +238,24 @@ extension DatabaseService {
             }
             
             completion(true)
-        } catch {
-            print("Error saving weight log: \(error.localizedDescription)")
-            completion(false)
+        } else {
+            // Create new log
+            let newLog = WeightLog(weight: weight, date: date)
+            
+            do {
+                _ = try db.collection("users").document(uid).collection("weight_logs").addDocument(from: newLog)
+                
+                // Also update current weight in profile if it exists
+                if var profile = userProfile {
+                    profile.weight = weight
+                    saveUserProfile(profile) { _ in }
+                }
+                
+                completion(true)
+            } catch {
+                print("Error saving weight log: \(error.localizedDescription)")
+                completion(false)
+            }
         }
     }
     

@@ -1968,10 +1968,9 @@ struct AnalyticsView: View {
                             .fontWeight(.black)
                             .foregroundColor(.white)
                     }
-                    Spacer()
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("WEIGHT LOG")
+                        Text("TODAY'S WEIGHT")
                             .font(.caption2)
                             .fontWeight(.bold)
                             .foregroundColor(.gray)
@@ -1980,31 +1979,8 @@ struct AnalyticsView: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
-                    Spacer()
-                    
-                    Button(action: {
-                        if let lastWeight = dbService.weightLogs.last?.weight {
-                            newWeightString = String(format: "%.1f", lastWeight)
-                        } else if let profileWeight = dbService.userProfile?.weight {
-                            newWeightString = String(format: "%.1f", profileWeight)
-                        } else {
-                            newWeightString = ""
-                        }
-                        showingWeightLog = true
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "scalemass.fill")
-                            Text("Log Weight")
-                        }
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .background(Theme.goldGradient)
-                        .cornerRadius(10)
-                    }
                 }
+                Spacer()
             }
             .padding()
             .glassCard()
@@ -2137,6 +2113,7 @@ struct AnalyticsView: View {
                             .cornerRadius(10)
                             .contentShape(Rectangle())
                             .onLongPressGesture {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 weightLogToDelete = log
                                 showingWeightDeleteConfirmation = true
                             }
@@ -2324,11 +2301,11 @@ struct AnalyticsView: View {
             // Vertical Stack of full-width tiles
             VStack(spacing: 16) {
                 GoalProgressRing(
-                    progress: Double(weeklyProteinMetCount()) / 7.0,
-                    title: "Protein Target",
-                    valueText: "\(weeklyProteinMetCount())/7 days",
-                    streak: calculateStreak(forGoal: proteinGoalMet),
-                    color: Theme.neonPurple
+                    progress: Double(weeklyDeficitMetCount()) / 7.0,
+                    title: "Deficit Target",
+                    valueText: "\(weeklyDeficitMetCount())/7 days",
+                    streak: calculateStreak(forGoal: deficitGoalMet),
+                    color: Theme.neonGreen
                 )
                 
                 GoalProgressRing(
@@ -2340,19 +2317,19 @@ struct AnalyticsView: View {
                 )
                 
                 GoalProgressRing(
+                    progress: Double(weeklyProteinMetCount()) / 7.0,
+                    title: "Protein Target",
+                    valueText: "\(weeklyProteinMetCount())/7 days",
+                    streak: calculateStreak(forGoal: proteinGoalMet),
+                    color: Theme.neonPurple
+                )
+                
+                GoalProgressRing(
                     progress: Double(weeklyWaterMetCount()) / 7.0,
                     title: "Water Target",
                     valueText: "\(weeklyWaterMetCount())/7 days",
                     streak: calculateStreak(forGoal: waterGoalMet),
                     color: Theme.neonOrange
-                )
-                
-                GoalProgressRing(
-                    progress: Double(weeklyDeficitMetCount()) / 7.0,
-                    title: "Deficit Target",
-                    valueText: "\(weeklyDeficitMetCount())/7 days",
-                    streak: calculateStreak(forGoal: deficitGoalMet),
-                    color: Theme.neonGreen
                 )
             }
             .padding(.horizontal)
@@ -2869,6 +2846,7 @@ struct FullWeightHistoryView: View {
                             .cornerRadius(10)
                             .contentShape(Rectangle())
                             .onLongPressGesture {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 weightLogToDelete = log
                                 showingDeleteConfirmation = true
                             }
