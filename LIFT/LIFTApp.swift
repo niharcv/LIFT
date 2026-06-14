@@ -26,6 +26,7 @@ struct LIFTApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)
                 .environmentObject(authManager)
                 .environmentObject(dbService)
         }

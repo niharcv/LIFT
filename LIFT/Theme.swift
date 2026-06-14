@@ -69,4 +69,29 @@ extension View {
     func glassCard() -> some View {
         self.modifier(GlassCardModifier())
     }
+    
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+    
+    func keyboardDoneButton() -> some View {
+        self.modifier(KeyboardDoneButtonModifier())
+    }
 }
+
+struct KeyboardDoneButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Theme.neonCyan)
+                }
+            }
+    }
+}
+

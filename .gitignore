@@ -2,6 +2,12 @@
 LIFT/GoogleService-Info.plist
 LIFT/GoogleService-Info*.plist
 
+# API Keys
+LIFT/Secrets.swift
+
+# Scratch Files
+scratch_usda.json
+
 # Xcode
 build/
 DerivedData/

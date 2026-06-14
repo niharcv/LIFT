@@ -12,8 +12,23 @@ class DatabaseService: ObservableObject {
     @Published var exercises: [Exercise] = []
     @Published var workoutLogs: [WorkoutLog] = []
     
-    private let db = Firestore.firestore()
-    private var userId: String? {
+    // Nutrition Properties
+    @Published var userProfile: UserProfile? = nil
+    @Published var todayFoodLogs: [FoodLogEntry] = []
+    @Published var customMeals: [CustomMeal] = []
+    @Published var weightLogs: [WeightLog] = []
+    @Published var waterIntake: Int = 0
+    
+    // Goals progress caching
+    @Published var last30DaysFoodLogs: [FoodLogEntry] = []
+    @Published var last30DaysWaterLogs: [String: Int] = [:]
+    
+    // Apple Health Sync Properties
+    @Published var healthKitWorkouts: [AppleHealthActivity] = []
+    @Published var isHealthKitAuthorized = false
+    
+    let db = Firestore.firestore()
+    var userId: String? {
         Auth.auth().currentUser?.uid
     }
     
@@ -21,8 +36,20 @@ class DatabaseService: ObservableObject {
     private var exercisesListener: ListenerRegistration?
     private var logsListener: ListenerRegistration?
     
+    var profileListener: ListenerRegistration?
+    var foodLogsListener: ListenerRegistration?
+    var customMealsListener: ListenerRegistration?
+    var weightLogsListener: ListenerRegistration?
+    var waterListener: ListenerRegistration?
+    var last30DaysFoodLogsListener: ListenerRegistration?
+    var last30DaysWaterLogsListener: ListenerRegistration?
+    
     func startListening() {
         guard let uid = userId else { return }
+        
+        // Auto-sync HealthKit on every launch — requestAuthorization is a no-op
+        // if the user has already granted permission, so this is always safe to call.
+        requestHealthKitAuthorization()
         
         // Listen to Categories
         categoriesListener = db.collection("users").document(uid).collection("categories")
@@ -62,6 +89,12 @@ class DatabaseService: ObservableObject {
                     try? doc.data(as: WorkoutLog.self)
                 }
             }
+            
+        // Start listening to persistent nutrition data (profile, custom meals, weight logs)
+        startListeningToPersistentNutrition()
+        
+        // Start listening to the last 30 days of data for Goals & Streaks
+        startListeningTo30DaysProgress()
     }
     
     func stopListening() {
@@ -69,9 +102,27 @@ class DatabaseService: ObservableObject {
         exercisesListener?.remove()
         logsListener?.remove()
         
+        profileListener?.remove()
+        foodLogsListener?.remove()
+        customMealsListener?.remove()
+        weightLogsListener?.remove()
+        waterListener?.remove()
+        
+        last30DaysFoodLogsListener?.remove()
+        last30DaysWaterLogsListener?.remove()
+        
         categories = []
         exercises = []
         workoutLogs = []
+        
+        userProfile = nil
+        todayFoodLogs = []
+        customMeals = []
+        weightLogs = []
+        waterIntake = 0
+        
+        last30DaysFoodLogs = []
+        last30DaysWaterLogs = [:]
     }
     
     // Add Category
@@ -259,5 +310,68 @@ class DatabaseService: ObservableObject {
                 completion(true)
             }
         }
+    }
+    
+    // Apple Health (HealthKit) Integration
+    func requestHealthKitAuthorization(completion: @escaping (Bool) -> Void = { _ in }) {
+        HealthKitManager.shared.requestAuthorization { [weak self] success, error in
+            DispatchQueue.main.async {
+                self?.isHealthKitAuthorized = success
+                if success {
+                    self?.syncHealthKitWorkouts(for: Date())
+                }
+                completion(success)
+            }
+        }
+    }
+    
+    func syncHealthKitWorkouts(for date: Date) {
+        HealthKitManager.shared.fetchWorkouts(for: date) { [weak self] workouts, error in
+            DispatchQueue.main.async {
+                self?.healthKitWorkouts = workouts
+            }
+        }
+    }
+    
+    func startListeningTo30DaysProgress() {
+        guard let uid = userId else { return }
+        
+        last30DaysFoodLogsListener?.remove()
+        last30DaysWaterLogsListener?.remove()
+        
+        let calendar = Calendar.current
+        let threeSixtyFiveDaysAgo = calendar.date(byAdding: .day, value: -365, to: calendar.startOfDay(for: Date()))!
+        
+        // 1. Listen to food logs for the last 365 days
+        last30DaysFoodLogsListener = db.collection("users").document(uid).collection("food_logs")
+            .whereField("date", isGreaterThanOrEqualTo: threeSixtyFiveDaysAgo)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error fetching 30 days food logs: \(error?.localizedDescription ?? "")")
+                    return
+                }
+                let logs = documents.compactMap { try? $0.data(as: FoodLogEntry.self) }
+                DispatchQueue.main.async {
+                    self?.last30DaysFoodLogs = logs
+                }
+            }
+            
+        // 2. Listen to water logs (entire collection is fine because it has one document per day)
+        last30DaysWaterLogsListener = db.collection("users").document(uid).collection("water_intake")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error fetching 30 days water logs: \(error?.localizedDescription ?? "")")
+                    return
+                }
+                var waterMap: [String: Int] = [:]
+                for doc in documents {
+                    if let amount = doc.data()["amount"] as? Int {
+                        waterMap[doc.documentID] = amount
+                    }
+                }
+                DispatchQueue.main.async {
+                    self?.last30DaysWaterLogs = waterMap
+                }
+            }
     }
 }
