@@ -2708,3 +2708,200 @@ struct BatteryIcon: View {
         }
     }
 }
+
+// MARK: - Full History View Sheets
+
+struct FullHistoryView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var dbService: DatabaseService
+    
+    var body: some View {
+        ZStack {
+            Theme.backgroundGradient.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("ALL WORKOUT HISTORY")
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundColor(Theme.neonCyan)
+                    .fontWeight(.bold)
+                }
+                .padding()
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        let liftItems: [(date: Date, id: String, isHealthKit: Bool, log: WorkoutLog?, activity: AppleHealthActivity?)] =
+                            dbService.workoutLogs.map { (date: $0.date, id: "lift-\($0.idString)", isHealthKit: false, log: $0, activity: nil) }
+                        let hkItems: [(date: Date, id: String, isHealthKit: Bool, log: WorkoutLog?, activity: AppleHealthActivity?)] =
+                            dbService.healthKitWorkouts.map { (date: $0.date, id: "hk-\($0.id)", isHealthKit: true, log: nil, activity: $0) }
+                        let merged = (liftItems + hkItems).sorted { $0.date > $1.date }
+                        
+                        if merged.isEmpty {
+                            Text("No history found.")
+                                .foregroundColor(.gray)
+                                .padding(.vertical, 40)
+                        } else {
+                            ForEach(merged, id: \.id) { item in
+                                if item.isHealthKit, let activity = item.activity {
+                                    AppleHealthActivityCard(activity: activity)
+                                } else if let log = item.log {
+                                    WorkoutLogCard(log: log)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+    }
+}
+
+struct FullExerciseHistoryView: View {
+    @Environment(\.dismiss) var dismiss
+    let exerciseName: String
+    let chartData: [AnalyticsView.ExerciseProgressPoint]
+    
+    var body: some View {
+        ZStack {
+            Theme.backgroundGradient.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                HStack {
+                    Text("\(exerciseName.uppercased()) HISTORY")
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button("Close") { dismiss() }
+                        .foregroundColor(Theme.neonCyan)
+                        .fontWeight(.bold)
+                }
+                .padding()
+                
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(chartData, id: \.date) { data in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(formatShortDate(data.date))
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                    Text("Max Weight: \(data.maxWeight, specifier: "%.1f") lbs")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.neonCyan)
+                                }
+                                Spacer()
+                                HStack(spacing: 2) {
+                                    ForEach(1...5, id: \.self) { star in
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(star <= data.rating ? Theme.neonGold : .gray.opacity(0.3))
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color.white.opacity(0.03))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func formatShortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+}
+
+struct FullWeightHistoryView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var dbService: DatabaseService
+    @State private var weightLogToDelete: WeightLog? = nil
+    @State private var showingDeleteConfirmation = false
+    
+    var body: some View {
+        ZStack {
+            Theme.backgroundGradient.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                HStack {
+                    Text("WEIGHT LOG HISTORY")
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button("Close") { dismiss() }
+                        .foregroundColor(Theme.neonGold)
+                        .fontWeight(.bold)
+                }
+                .padding()
+                
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(dbService.weightLogs.reversed()) { log in
+                            HStack {
+                                Text(formatShortDate(log.date))
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text("\(log.weight, specifier: "%.1f") lbs")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Theme.neonGold)
+                            }
+                            .padding()
+                            .background(Color.white.opacity(0.02))
+                            .cornerRadius(10)
+                            .contentShape(Rectangle())
+                            .onLongPressGesture {
+                                weightLogToDelete = log
+                                showingDeleteConfirmation = true
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete Weight Log?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Entry", role: .destructive) {
+                if let log = weightLogToDelete, let id = log.id {
+                    dbService.deleteWeightLog(id: id) { _ in }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                weightLogToDelete = nil
+            }
+        } message: {
+            if let log = weightLogToDelete {
+                Text("Are you sure you want to delete the weight log of \(log.weight, specifier: "%.1f") lbs on \(formatShortDate(log.date))?")
+            }
+        }
+    }
+    
+    private func formatShortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+}
